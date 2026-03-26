@@ -1,0 +1,72 @@
+name: 🚀 Java API CI/CD Pipeline (Free)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  IMAGE_NAME: java-api
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🔍 Checkout Code
+        uses: actions/checkout@v3
+
+      - name: ☕ Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: 📦 Build with Maven
+        run: mvn clean package -DskipTests
+
+      - name: 🧪 Run Tests
+        run: mvn test
+
+      - name: 🐳 Build Docker Image
+        run: docker build -t $IMAGE_NAME .
+
+      - name: 🔍 Trivy Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}
+          format: table
+          exit-code: 0
+          severity: HIGH,CRITICAL
+
+      - name: 🔐 Login Docker Hub
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+
+      - name: 🏷️ Tag Docker Image
+        run: docker tag $IMAGE_NAME ${{ secrets.DOCKER_USERNAME }}/java-api:latest
+
+      - name: 📤 Push Docker Hub
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/java-api:latest
+
+      - name: 📦 Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: java-api-artifact
+          path: target/*.jar
+
+  deploy-staging:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Download JAR
+        uses: actions/download-artifact@v4
+        with:
+          name: java-api-artifact
+
+      - name: 🚀 Fake Deploy
+        run: |
+          echo "✅ Build realizado com sucesso"
+          echo "📡 Deploy simulado (sem Azure)"
